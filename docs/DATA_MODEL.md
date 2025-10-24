@@ -89,8 +89,12 @@ CREATE TABLE slides (
   template_id TEXT,
   title TEXT,
   notes TEXT,
+  talk_script TEXT,
   order_index INTEGER NOT NULL,
   background JSON,
+  display_duration INTEGER DEFAULT 5,
+  transition JSON,
+  voice_settings JSON,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -165,11 +169,13 @@ CREATE INDEX idx_themes_category ON themes(category);
 CREATE TABLE assets (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('image', 'video', 'audio', 'font')),
+  type TEXT NOT NULL CHECK(type IN ('image', 'video', 'audio', 'font', 'svg')),
   filename TEXT NOT NULL,
   filepath TEXT NOT NULL,
   size INTEGER NOT NULL,
   mime_type TEXT NOT NULL,
+  description TEXT,
+  tags TEXT,
   metadata JSON,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -177,6 +183,27 @@ CREATE TABLE assets (
 
 CREATE INDEX idx_assets_project_id ON assets(project_id);
 CREATE INDEX idx_assets_type ON assets(type);
+CREATE INDEX idx_assets_tags ON assets(tags);
+```
+
+#### icon_library テーブル
+```sql
+CREATE TABLE icon_library (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  icon_set TEXT NOT NULL,
+  category TEXT,
+  tags TEXT,
+  svg_content TEXT NOT NULL,
+  keywords TEXT,
+  is_system BOOLEAN NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_icon_library_set ON icon_library(icon_set);
+CREATE INDEX idx_icon_library_category ON icon_library(category);
+CREATE INDEX idx_icon_library_keywords ON icon_library(keywords);
+CREATE VIRTUAL TABLE icon_library_fts USING fts5(name, tags, keywords, content=icon_library);
 ```
 
 #### ai_generations テーブル
@@ -185,7 +212,7 @@ CREATE TABLE ai_generations (
   id TEXT PRIMARY KEY,
   project_id TEXT,
   slide_id TEXT,
-  type TEXT NOT NULL CHECK(type IN ('slide_structure', 'content', 'image')),
+  type TEXT NOT NULL CHECK(type IN ('slide_structure', 'content', 'image', 'talk_script', 'icon_suggestion')),
   prompt TEXT NOT NULL,
   parameters JSON,
   result JSON,
@@ -297,6 +324,21 @@ interface ProjectSettings {
       steps?: number;
       cfgScale?: number;
     };
+    tts?: {
+      provider: 'web-speech' | 'coqui' | 'piper' | 'voicevox' | 'custom';
+      apiUrl?: string; // ローカルTTSの場合
+      defaultVoice?: string;
+      defaultRate?: number;
+      defaultPitch?: number;
+    };
+  };
+
+  // デジタルサイネージ設定
+  signage?: {
+    defaultDisplayDuration: number; // 秒
+    defaultTransition: TransitionSettings;
+    autoPlay: boolean;
+    loop: boolean;
   };
 
   // エクスポート設定
@@ -305,6 +347,11 @@ interface ProjectSettings {
       pageSize: 'A4' | 'letter' | 'slide';
       orientation: 'landscape' | 'portrait';
       quality: 'low' | 'medium' | 'high' | 'maximum';
+    };
+    video?: {
+      format: 'mp4' | 'webm' | 'mov';
+      fps: number;
+      quality: 'low' | 'medium' | 'high';
     };
   };
 }
@@ -319,14 +366,34 @@ interface Slide {
   templateId?: ID;
   title: string;
   notes?: string;
+  talkScript?: string;
   orderIndex: number;
   background?: Background;
+  displayDuration?: number; // 秒単位（サイネージモード用）
+  transition?: TransitionSettings;
+  voiceSettings?: VoiceSettings;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 
   // リレーション（取得時）
   elements?: Element[];
   template?: Template;
+}
+
+// トランジション設定
+interface TransitionSettings {
+  type: 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom' | 'flip' | 'cube';
+  duration: number; // ミリ秒
+  easing?: 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
+}
+
+// 音声設定
+interface VoiceSettings {
+  voice?: string; // 音声ID（Web Speech APIまたはローカルTTS）
+  rate?: number;  // 0.5 - 2.0
+  pitch?: number; // 0.5 - 2.0
+  volume?: number; // 0.0 - 1.0
+  language?: string; // 'ja-JP', 'en-US' など
 }
 
 // スライド作成用の入力型
@@ -342,9 +409,13 @@ interface CreateSlideInput {
 interface UpdateSlideInput {
   title?: string;
   notes?: string;
+  talkScript?: string;
   orderIndex?: number;
   background?: Background;
   templateId?: ID;
+  displayDuration?: number;
+  transition?: TransitionSettings;
+  voiceSettings?: VoiceSettings;
 }
 ```
 
@@ -653,11 +724,13 @@ interface Asset {
   filepath: string;
   size: number; // bytes
   mimeType: string;
+  description?: string;
+  tags?: string[]; // タグ配列
   metadata?: AssetMetadata;
   createdAt: Timestamp;
 }
 
-type AssetType = 'image' | 'video' | 'audio' | 'font';
+type AssetType = 'image' | 'video' | 'audio' | 'font' | 'svg';
 
 interface AssetMetadata {
   // 画像の場合
@@ -675,8 +748,35 @@ interface AssetMetadata {
     cfgScale?: number;
   };
 
+  // SVG の場合
+  svgContent?: string; // SVGソースコード
+
   // その他
   [key: string]: any;
+}
+```
+
+### Icon Library（アイコンライブラリ）
+
+```typescript
+interface IconLibrary {
+  id: ID;
+  name: string;
+  iconSet: IconSet;
+  category?: string;
+  tags: string[];
+  svgContent: string;
+  keywords: string[];
+  isSystem: boolean;
+  createdAt: Timestamp;
+}
+
+type IconSet = 'heroicons' | 'feather' | 'material-icons' | 'font-awesome' | 'custom';
+
+// アイコン検索結果
+interface IconSearchResult {
+  icon: IconLibrary;
+  relevance: number; // 0-1の関連度スコア
 }
 ```
 
@@ -697,7 +797,7 @@ interface AIGeneration {
   completedAt?: Timestamp;
 }
 
-type AIGenerationType = 'slide_structure' | 'content' | 'image';
+type AIGenerationType = 'slide_structure' | 'content' | 'image' | 'talk_script' | 'icon_suggestion';
 
 // スライド構成生成の結果
 interface SlideStructureResult {
@@ -724,6 +824,24 @@ interface ImageGenerationResult {
     seed: number;
     model: string;
   };
+}
+
+// トークスクリプト生成の結果
+interface TalkScriptGenerationResult {
+  script: string;
+  estimatedDuration: number; // 秒
+  alternatives?: string[];
+}
+
+// アイコン提案の結果
+interface IconSuggestionResult {
+  suggestions: Array<{
+    iconId: ID;
+    iconName: string;
+    iconSet: IconSet;
+    relevance: number; // 0-1
+    reasoning?: string; // なぜこのアイコンが適切か
+  }>;
 }
 ```
 

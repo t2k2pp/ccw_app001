@@ -713,7 +713,334 @@ POST /ai/improve-content
 }
 ```
 
-### 8. Export（エクスポート）
+#### トークスクリプト生成
+```
+POST /ai/generate-talk-script
+```
+
+**リクエストボディ**:
+```json
+{
+  "slideId": "slide_001",
+  "parameters": {
+    "length": "standard",
+    "tone": "formal",
+    "targetAudience": "business",
+    "language": "ja"
+  }
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "generationId": "gen_003",
+    "status": "processing"
+  }
+}
+```
+
+**生成完了後**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "gen_003",
+    "status": "completed",
+    "result": {
+      "script": "本日は新製品の発表にお越しいただき、誠にありがとうございます。この製品は、お客様のビジネス課題を解決するために開発されました。",
+      "estimatedDuration": 15,
+      "alternatives": [
+        "皆様、本日はお忙しい中お集まりいただき、ありがとうございます...",
+        "ご来場の皆様、この度は弊社の新製品発表会にご参加いただき..."
+      ]
+    }
+  }
+}
+```
+
+#### アイコン提案
+```
+POST /ai/suggest-icons
+```
+
+**リクエストボディ**:
+```json
+{
+  "slideId": "slide_002",
+  "context": "financial growth and analytics",
+  "parameters": {
+    "maxSuggestions": 5,
+    "iconSets": ["heroicons", "feather"]
+  }
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "suggestions": [
+      {
+        "iconId": "icon_chart_bar",
+        "iconName": "chart-bar",
+        "iconSet": "heroicons",
+        "relevance": 0.95,
+        "reasoning": "棒グラフは成長を視覚的に表現するのに最適です"
+      },
+      {
+        "iconId": "icon_trending_up",
+        "iconName": "trending-up",
+        "iconSet": "feather",
+        "relevance": 0.92,
+        "reasoning": "上昇トレンドは金融成長を直接的に示します"
+      }
+    ]
+  }
+}
+```
+
+### 8. Icons（アイコン）
+
+#### アイコン検索
+```
+GET /icons/search
+```
+
+**クエリパラメータ**:
+- `q` (string, required): 検索キーワード
+- `iconSet` (string, optional): アイコンセット（heroicons, feather, material-icons, font-awesome）
+- `category` (string, optional): カテゴリフィルター
+- `limit` (number, optional): 最大結果数（デフォルト: 20）
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "icon_001",
+      "name": "check-circle",
+      "iconSet": "heroicons",
+      "category": "actions",
+      "tags": ["check", "success", "done", "complete"],
+      "svgContent": "<svg>...</svg>"
+    }
+  ]
+}
+```
+
+#### アイコン一覧取得
+```
+GET /icons
+```
+
+**クエリパラメータ**:
+- `iconSet` (string, optional): アイコンセット
+- `category` (string, optional): カテゴリ
+- `page` (number, optional): ページ番号
+- `limit` (number, optional): 1ページあたりの件数
+
+**レスポンス**: アイコンリストとページネーション情報
+
+### 9. Assets（アセット）拡張
+
+#### アセット検索（セマンティック検索）
+```
+POST /assets/search
+```
+
+**リクエストボディ**:
+```json
+{
+  "projectId": "proj_123",
+  "query": "business meeting",
+  "type": "image",
+  "useAI": true
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "asset": {
+        "id": "asset_456",
+        "filename": "conference_room.jpg",
+        "description": "Modern conference room with people",
+        "tags": ["business", "meeting", "office"]
+      },
+      "relevance": 0.88
+    }
+  ]
+}
+```
+
+#### アセットタグ更新
+```
+PUT /assets/:id/tags
+```
+
+**リクエストボディ**:
+```json
+{
+  "tags": ["business", "teamwork", "collaboration"],
+  "description": "Team collaboration in modern office"
+}
+```
+
+**レスポンス**: 更新後のアセットオブジェクト
+
+### 10. Signage（デジタルサイネージ）
+
+#### サイネージ設定取得
+```
+GET /projects/:projectId/signage-settings
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "autoPlay": true,
+    "loop": true,
+    "defaultDisplayDuration": 10,
+    "defaultTransition": {
+      "type": "fade",
+      "duration": 500,
+      "easing": "ease-in-out"
+    }
+  }
+}
+```
+
+#### サイネージ設定更新
+```
+PUT /projects/:projectId/signage-settings
+```
+
+**リクエストボディ**:
+```json
+{
+  "autoPlay": true,
+  "loop": true,
+  "defaultDisplayDuration": 15,
+  "defaultTransition": {
+    "type": "slide-left",
+    "duration": 800
+  }
+}
+```
+
+**レスポンス**: 更新後の設定
+
+### 11. TTS（音声合成）
+
+#### 音声合成（リアルタイム）
+```
+POST /tts/speak
+```
+
+**リクエストボディ**:
+```json
+{
+  "text": "こんにちは、これはテスト音声です。",
+  "voiceSettings": {
+    "voice": "ja-JP-Neural2-B",
+    "rate": 1.0,
+    "pitch": 1.0,
+    "volume": 1.0
+  }
+}
+```
+
+**レスポンス**: 音声データ（ストリーミング）または音声ファイルURL
+
+#### 音声ファイル生成
+```
+POST /tts/generate-audio
+```
+
+**リクエストボディ**:
+```json
+{
+  "slideId": "slide_001",
+  "format": "mp3"
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "audioUrl": "/audio/slide_001_voice.mp3",
+    "duration": 15.5
+  }
+}
+```
+
+#### プロジェクト全体の音声生成
+```
+POST /tts/generate-project-audio
+```
+
+**リクエストボディ**:
+```json
+{
+  "projectId": "proj_123",
+  "format": "mp3",
+  "mergeAll": true
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "audio_job_001",
+    "status": "processing"
+  }
+}
+```
+
+#### 利用可能な音声一覧
+```
+GET /tts/voices
+```
+
+**クエリパラメータ**:
+- `language` (string, optional): 言語フィルター（ja, en等）
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "ja-JP-Neural2-B",
+      "name": "Japanese Female",
+      "language": "ja-JP",
+      "gender": "female"
+    },
+    {
+      "id": "ja-JP-Neural2-C",
+      "name": "Japanese Male",
+      "language": "ja-JP",
+      "gender": "male"
+    }
+  ]
+}
+```
+
+### 12. Export（エクスポート）
 
 #### PDF エクスポート
 ```
@@ -792,7 +1119,60 @@ POST /export/html
 }
 ```
 
-### 9. Settings（設定）
+#### 動画エクスポート（音声付き）（Phase 4）
+```
+POST /export/video
+```
+
+**リクエストボディ**:
+```json
+{
+  "projectId": "proj_123",
+  "options": {
+    "format": "mp4",
+    "resolution": "1080p",
+    "fps": 30,
+    "quality": "high",
+    "includeAudio": true,
+    "audioSource": "talkScript",
+    "includeSubtitles": false
+  }
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "exportId": "export_video_001",
+    "status": "processing",
+    "estimatedTime": 120
+  }
+}
+```
+
+**エクスポート完了確認**:
+```
+GET /export/:exportId
+```
+
+**レスポンス（完了時）**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "export_video_001",
+    "status": "completed",
+    "fileUrl": "/downloads/presentation_with_audio.mp4",
+    "fileSize": 52428800,
+    "duration": 180,
+    "expiresAt": "2025-10-25T10:00:00Z"
+  }
+}
+```
+
+### 13. Settings（設定）
 
 #### 設定取得
 ```
@@ -818,7 +1198,22 @@ GET /settings
         "model": "sd-v1.5",
         "steps": 30,
         "cfgScale": 7.5
+      },
+      "tts": {
+        "provider": "web-speech",
+        "defaultVoice": "ja-JP-Neural2-B",
+        "defaultRate": 1.0,
+        "defaultPitch": 1.0
       }
+    },
+    "signage": {
+      "defaultDisplayDuration": 10,
+      "defaultTransition": {
+        "type": "fade",
+        "duration": 500
+      },
+      "autoPlay": false,
+      "loop": false
     },
     "editor": {
       "gridEnabled": true,
