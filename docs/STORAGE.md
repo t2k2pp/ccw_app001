@@ -813,6 +813,42 @@ export const localStorageService = new LocalStorageService();
 
 ## エクスポート/インポート仕様
 
+### サポートする形式
+
+| 形式 | エクスポート | インポート | 用途 | 特徴 |
+|-----|------------|-----------|------|------|
+| **JSON** | ✅ | ✅ | データバックアップ | 小規模、可読性高 |
+| **ZIP** | ✅ | ✅ | データバックアップ | 大規模、効率的 |
+| **Marp (Markdown)** | ✅ | ✅ | プレゼン共有 | テキストベース、Git管理可 |
+| **PowerPoint (PPTX)** | ✅ | ❌ | 他ツールとの互換 | 広く使われる形式 |
+| **PDF** | ✅ | ❌ | 配布・印刷 | 閲覧専用 |
+| **HTML (reveal.js)** | ✅ | ❌ | Webプレゼン | ブラウザで動作 |
+
+### 画像フィット方法の扱い
+
+すべてのエクスポート形式で、以下の画像フィット方法をサポートします：
+
+```typescript
+type ImageFit = 'contain' | 'cover' | 'fill' | 'none';
+
+interface ImageFitBehavior {
+  contain: '縦横比を保持し、全体を表示（余白あり）';
+  cover: '縦横比を保持し、領域を埋める（切り取りあり）';
+  fill: '縦横比を無視し、領域に合わせて引き伸ばす';
+  none: '元のサイズで表示（中央配置）';
+}
+```
+
+#### 各形式での画像フィット変換
+
+| 形式 | contain | cover | fill | none |
+|-----|---------|-------|------|------|
+| **JSON/ZIP** | そのまま保持 | そのまま保持 | そのまま保持 | そのまま保持 |
+| **Marp** | `![bg contain]` | `![bg cover]` | `![bg fit]` | `![w:auto]` |
+| **PPTX** | `sizing.type: 'contain'` | `sizing.type: 'cover'` | `sizing.type: 'crop'` | サイズ指定なし |
+| **PDF** | 計算で実装 | 計算で実装 | 領域に合わせる | 中央配置 |
+| **HTML** | `object-fit: contain` | `object-fit: cover` | `object-fit: fill` | `object-fit: none` |
+
 ### エクスポート形式
 
 #### 1. JSON形式（小規模プロジェクト向け）
@@ -1255,6 +1291,909 @@ interface ImportResult {
   slideCount: number;
   assetCount: number;
   errors?: string[];
+}
+```
+
+#### 3. Marp形式（Markdown Presentation）
+
+Marpは、Markdownでプレゼンテーションを作成できる人気のツールです。
+テキストベースなのでGit管理が容易で、エンジニアやライター向けに最適です。
+
+**エクスポート実装**:
+
+```typescript
+// services/export/marpExporter.ts
+
+export class MarpExporter {
+  /**
+   * Marp Markdown形式でエクスポート
+   */
+  static async exportAsMarp(projectId: string): Promise<Blob> {
+    const storageManager = new StorageManager();
+    const project = await storageManager.getProject(projectId);
+    const slides = await storageManager.getSlidesByProject(projectId);
+
+    let markdown = '';
+
+    // Frontmatter（設定）
+    markdown += '---\n';
+    markdown += 'marp: true\n';
+    markdown += `theme: ${this.getThemeName(project.themeId)}\n`;
+    markdown += 'paginate: true\n';
+    markdown += 'size: 16:9\n';
+    markdown += '---\n\n';
+
+    // 各スライド
+    for (const slide of slides) {
+      markdown += await this.convertSlideToMarp(slide, storageManager);
+      markdown += '\n---\n\n';
+    }
+
+    return new Blob([markdown], { type: 'text/markdown' });
+  }
+
+  /**
+   * スライドをMarp Markdownに変換
+   */
+  private static async convertSlideToMarp(
+    slide: Slide,
+    storageManager: StorageManager
+  ): Promise<string> {
+    let markdown = '';
+
+    // 背景画像
+    const bgElement = slide.elements.find(
+      (el) => el.type === 'image' && this.isBackgroundImage(el)
+    );
+    if (bgElement && bgElement.type === 'image') {
+      const asset = await storageManager.getAsset(bgElement.properties.assetId);
+      const fit = bgElement.properties.objectFit || 'cover';
+      const fitDirective = this.getFitDirective(fit);
+
+      // 画像を埋め込み（Data URL）
+      const dataUrl = await this.blobToDataURL(asset.blob);
+      markdown += `![bg ${fitDirective}](${dataUrl})\n\n`;
+    }
+
+    // タイトル
+    if (slide.title) {
+      markdown += `# ${slide.title}\n\n`;
+    }
+
+    // テキスト要素
+    const textElements = slide.elements.filter((el) => el.type === 'text');
+    for (const textEl of textElements) {
+      if (textEl.type === 'text') {
+        const { content, fontSize } = textEl.properties;
+
+        // フォントサイズに応じて見出しレベルを決定
+        if (fontSize >= 32) {
+          markdown += `## ${content}\n\n`;
+        } else if (fontSize >= 24) {
+          markdown += `### ${content}\n\n`;
+        } else {
+          markdown += `${content}\n\n`;
+        }
+      }
+    }
+
+    // インライン画像
+    const imageElements = slide.elements.filter(
+      (el) => el.type === 'image' && !this.isBackgroundImage(el)
+    );
+    for (const imgEl of imageElements) {
+      if (imgEl.type === 'image') {
+        const asset = await storageManager.getAsset(imgEl.properties.assetId);
+        const dataUrl = await this.blobToDataURL(asset.blob);
+
+        // サイズ指定
+        const width = imgEl.width;
+        markdown += `![w:${width}px](${dataUrl})\n\n`;
+      }
+    }
+
+    // ノート（speaker notes）
+    if (slide.notes) {
+      markdown += `<!-- ${slide.notes} -->\n\n`;
+    }
+
+    return markdown;
+  }
+
+  /**
+   * 画像フィット方法をMarp形式に変換
+   */
+  private static getFitDirective(fit: ImageFit): string {
+    const map: Record<ImageFit, string> = {
+      contain: 'contain',
+      cover: 'cover',
+      fill: 'fit',
+      none: 'auto',
+    };
+    return map[fit] || 'cover';
+  }
+
+  private static isBackgroundImage(element: Element): boolean {
+    // zIndex が最も低い画像を背景とみなす
+    return element.zIndex === 0;
+  }
+
+  private static blobToDataURL(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+}
+```
+
+**インポート実装**:
+
+```typescript
+// services/export/marpImporter.ts
+
+import { marked } from 'marked';
+import matter from 'gray-matter';
+
+export class MarpImporter {
+  /**
+   * Marp Markdown形式からインポート
+   */
+  static async importFromMarp(file: File): Promise<ImportResult> {
+    const text = await file.text();
+
+    // Frontmatter（YAML）とコンテンツを分離
+    const { data: frontmatter, content } = matter(text);
+
+    // スライド分割（--- で区切られている）
+    const slideTexts = content.split(/\n---\n/);
+
+    const storageManager = new StorageManager();
+
+    // プロジェクト作成
+    const project: Project = {
+      id: this.generateId('proj'),
+      name: file.name.replace(/\.md$/, ''),
+      description: 'Imported from Marp',
+      themeId: this.getThemeIdFromMarp(frontmatter.theme),
+      settings: {
+        defaultTransition: 'fade',
+        defaultDisplayDuration: 5,
+        aspectRatio: frontmatter.size === '4:3' ? '4:3' : '16:9',
+        resolution: { width: 1920, height: 1080 },
+      },
+      metadata: {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        slideCount: slideTexts.length,
+        totalSize: 0,
+      },
+    };
+
+    await storageManager.saveProject(project);
+
+    // 各スライドをパース
+    for (let i = 0; i < slideTexts.length; i++) {
+      const slideText = slideTexts[i];
+      const slide = await this.parseSlide(slideText, project.id, i, storageManager);
+      await storageManager.saveSlide(slide);
+    }
+
+    return {
+      success: true,
+      projectCount: 1,
+      slideCount: slideTexts.length,
+      assetCount: 0, // TODO: 画像カウント
+    };
+  }
+
+  /**
+   * スライドテキストをパースしてSlideオブジェクトに変換
+   */
+  private static async parseSlide(
+    text: string,
+    projectId: string,
+    orderIndex: number,
+    storageManager: StorageManager
+  ): Promise<Slide> {
+    const elements: Element[] = [];
+
+    // 背景画像の検出（![bg ...](...)）
+    const bgImageRegex = /!\[bg\s+(contain|cover|fit|auto)\]\((.+?)\)/;
+    const bgMatch = text.match(bgImageRegex);
+
+    if (bgMatch) {
+      const fit = this.parseFitDirective(bgMatch[1]);
+      const imageUrl = bgMatch[2];
+
+      // 画像を取得してアセットとして保存
+      const asset = await this.createAssetFromUrl(imageUrl, projectId);
+      await storageManager.saveAsset(asset);
+
+      // 背景画像要素を作成
+      elements.push({
+        id: this.generateId('elem'),
+        type: 'image',
+        x: 0,
+        y: 0,
+        width: 1920,
+        height: 1080,
+        rotation: 0,
+        zIndex: 0,
+        locked: false,
+        visible: true,
+        properties: {
+          assetId: asset.id,
+          objectFit: fit,
+          opacity: 1,
+        },
+      });
+
+      // 背景画像マークダウンを削除
+      text = text.replace(bgImageRegex, '');
+    }
+
+    // タイトルの検出（# で始まる行）
+    const titleMatch = text.match(/^#\s+(.+)$/m);
+    const title = titleMatch ? titleMatch[1] : `Slide ${orderIndex + 1}`;
+
+    // その他のテキストをパース
+    // TODO: Markdownパーサーでテキスト要素に変換
+
+    return {
+      id: this.generateId('slide'),
+      projectId,
+      title,
+      orderIndex,
+      elements,
+      background: { type: 'solid', color: '#ffffff' },
+      displayDuration: 5,
+      transition: { type: 'fade', duration: 300 },
+      metadata: {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    };
+  }
+
+  /**
+   * Marpのフィット方法を変換
+   */
+  private static parseFitDirective(directive: string): ImageFit {
+    const map: Record<string, ImageFit> = {
+      contain: 'contain',
+      cover: 'cover',
+      fit: 'fill',
+      auto: 'none',
+    };
+    return map[directive] || 'cover';
+  }
+
+  private static async createAssetFromUrl(
+    url: string,
+    projectId: string
+  ): Promise<Asset> {
+    // Data URLの場合
+    if (url.startsWith('data:')) {
+      const response = await fetch(url);
+      const blob = await response.blob();
+
+      return {
+        id: this.generateId('asset'),
+        projectId,
+        name: 'imported-image.png',
+        type: 'image',
+        mimeType: blob.type,
+        blob,
+        size: blob.size,
+        metadata: {
+          createdAt: new Date(),
+          source: 'url-import',
+        },
+      };
+    }
+
+    // 外部URLの場合（TODO: 実装）
+    throw new Error('External URL import not yet implemented');
+  }
+
+  private static generateId(prefix: string): string {
+    return `${prefix}_${Math.random().toString(36).substring(2, 11)}`;
+  }
+
+  private static getThemeIdFromMarp(theme?: string): string {
+    // Marpテーマ名から内部テーマIDへのマッピング
+    const map: Record<string, string> = {
+      default: 'theme_modern_blue',
+      gaia: 'theme_elegant_dark',
+      uncover: 'theme_minimal_white',
+    };
+    return map[theme || 'default'] || 'theme_modern_blue';
+  }
+}
+```
+
+#### 4. PowerPoint (PPTX) 形式
+
+PowerPoint形式でエクスポートすることで、Microsoft PowerPoint やGoogle Slidesで開けます。
+
+**エクスポート実装**:
+
+```typescript
+// services/export/pptxExporter.ts
+
+import pptxgen from 'pptxgenjs';
+
+export class PPTXExporter {
+  /**
+   * PowerPoint形式でエクスポート
+   */
+  static async exportAsPPTX(projectId: string): Promise<Blob> {
+    const storageManager = new StorageManager();
+    const project = await storageManager.getProject(projectId);
+    const slides = await storageManager.getSlidesByProject(projectId);
+
+    const pptx = new pptxgen();
+
+    // プレゼンテーション設定
+    pptx.layout = 'LAYOUT_16x9';
+    pptx.author = 'Local AI Slide Creator';
+    pptx.title = project.name;
+
+    // 各スライドを追加
+    for (const slideData of slides) {
+      const slide = pptx.addSlide();
+      await this.addSlideContent(slide, slideData, storageManager);
+    }
+
+    // Blob生成
+    const blob = await pptx.write({ outputType: 'blob' });
+    return blob as Blob;
+  }
+
+  /**
+   * スライドにコンテンツを追加
+   */
+  private static async addSlideContent(
+    pptxSlide: pptxgen.Slide,
+    slideData: Slide,
+    storageManager: StorageManager
+  ): Promise<void> {
+    // 背景
+    if (slideData.background.type === 'solid' && slideData.background.color) {
+      pptxSlide.background = { color: slideData.background.color.replace('#', '') };
+    } else if (slideData.background.type === 'image' && slideData.background.imageAssetId) {
+      const asset = await storageManager.getAsset(slideData.background.imageAssetId);
+      const dataUrl = await this.blobToDataURL(asset.blob);
+      pptxSlide.background = { data: dataUrl };
+    }
+
+    // 要素を追加
+    for (const element of slideData.elements) {
+      await this.addElement(pptxSlide, element, storageManager);
+    }
+  }
+
+  /**
+   * 要素を追加
+   */
+  private static async addElement(
+    pptxSlide: pptxgen.Slide,
+    element: Element,
+    storageManager: StorageManager
+  ): Promise<void> {
+    // 座標をインチに変換（PowerPointはインチ単位）
+    const x = this.pxToInch(element.x);
+    const y = this.pxToInch(element.y);
+    const w = this.pxToInch(element.width);
+    const h = this.pxToInch(element.height);
+
+    switch (element.type) {
+      case 'text':
+        const textProps = element.properties as TextProperties;
+        pptxSlide.addText(textProps.content, {
+          x,
+          y,
+          w,
+          h,
+          fontSize: textProps.fontSize,
+          fontFace: textProps.fontFamily,
+          bold: textProps.fontWeight === 'bold',
+          italic: textProps.fontStyle === 'italic',
+          color: textProps.color.replace('#', ''),
+          align: textProps.align,
+          valign: 'middle',
+        });
+        break;
+
+      case 'image':
+        const imgProps = element.properties as ImageProperties;
+        const asset = await storageManager.getAsset(imgProps.assetId);
+        const dataUrl = await this.blobToDataURL(asset.blob);
+
+        // 画像フィット方法を変換
+        const sizing = this.convertImageFit(imgProps.objectFit, w, h);
+
+        pptxSlide.addImage({
+          data: dataUrl,
+          x,
+          y,
+          w,
+          h,
+          sizing,
+        });
+        break;
+
+      case 'shape':
+        const shapeProps = element.properties as ShapeProperties;
+        pptxSlide.addShape(pptxgen.ShapeType.rect, {
+          x,
+          y,
+          w,
+          h,
+          fill: { color: shapeProps.fill?.replace('#', '') || 'FFFFFF' },
+          line: shapeProps.stroke
+            ? {
+                color: shapeProps.stroke.replace('#', ''),
+                width: shapeProps.strokeWidth || 1,
+              }
+            : undefined,
+        });
+        break;
+    }
+  }
+
+  /**
+   * 画像フィット方法をPowerPoint形式に変換
+   */
+  private static convertImageFit(
+    fit: ImageFit,
+    width: number,
+    height: number
+  ): pptxgen.ImageSizing {
+    switch (fit) {
+      case 'contain':
+        return {
+          type: 'contain',
+          w: width,
+          h: height,
+        };
+      case 'cover':
+        return {
+          type: 'cover',
+          w: width,
+          h: height,
+        };
+      case 'fill':
+        return {
+          type: 'crop',
+          w: width,
+          h: height,
+        };
+      case 'none':
+      default:
+        return { w: width, h: height };
+    }
+  }
+
+  /**
+   * ピクセルをインチに変換（96 DPI）
+   */
+  private static pxToInch(px: number): number {
+    return px / 96;
+  }
+
+  private static blobToDataURL(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+}
+```
+
+#### 5. PDF形式
+
+PDF形式でエクスポートすることで、配布や印刷が容易になります。
+
+**エクスポート実装**:
+
+```typescript
+// services/export/pdfExporter.ts
+
+import jsPDF from 'jspdf';
+
+export class PDFExporter {
+  /**
+   * PDF形式でエクスポート
+   */
+  static async exportAsPDF(projectId: string): Promise<Blob> {
+    const storageManager = new StorageManager();
+    const project = await storageManager.getProject(projectId);
+    const slides = await storageManager.getSlidesByProject(projectId);
+
+    // PDF作成（横向き、1920x1080px）
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'px',
+      format: [1920, 1080],
+    });
+
+    // 各スライドを追加
+    for (let i = 0; i < slides.length; i++) {
+      if (i > 0) {
+        pdf.addPage();
+      }
+
+      await this.renderSlide(pdf, slides[i], storageManager);
+    }
+
+    return pdf.output('blob');
+  }
+
+  /**
+   * スライドをPDFページにレンダリング
+   */
+  private static async renderSlide(
+    pdf: jsPDF,
+    slide: Slide,
+    storageManager: StorageManager
+  ): Promise<void> {
+    // 背景
+    if (slide.background.type === 'solid' && slide.background.color) {
+      pdf.setFillColor(slide.background.color);
+      pdf.rect(0, 0, 1920, 1080, 'F');
+    } else if (slide.background.type === 'image' && slide.background.imageAssetId) {
+      const asset = await storageManager.getAsset(slide.background.imageAssetId);
+      const dataUrl = await this.blobToDataURL(asset.blob);
+      pdf.addImage(dataUrl, 'PNG', 0, 0, 1920, 1080);
+    }
+
+    // 要素を描画（zIndex順）
+    const sortedElements = [...slide.elements].sort((a, b) => a.zIndex - b.zIndex);
+
+    for (const element of sortedElements) {
+      await this.renderElement(pdf, element, storageManager);
+    }
+  }
+
+  /**
+   * 要素をレンダリング
+   */
+  private static async renderElement(
+    pdf: jsPDF,
+    element: Element,
+    storageManager: StorageManager
+  ): Promise<void> {
+    switch (element.type) {
+      case 'text':
+        const textProps = element.properties as TextProperties;
+        pdf.setFont(textProps.fontFamily || 'helvetica');
+        pdf.setFontSize(textProps.fontSize);
+        pdf.setTextColor(textProps.color);
+
+        // テキスト配置
+        const textAlign = textProps.align === 'center' ? 'center' : 'left';
+        pdf.text(textProps.content, element.x, element.y, {
+          align: textAlign,
+          maxWidth: element.width,
+        });
+        break;
+
+      case 'image':
+        const imgProps = element.properties as ImageProperties;
+        const asset = await storageManager.getAsset(imgProps.assetId);
+        const dataUrl = await this.blobToDataURL(asset.blob);
+
+        // 画像フィット方法に応じて配置を計算
+        const placement = await this.calculateImagePlacement(
+          dataUrl,
+          element.x,
+          element.y,
+          element.width,
+          element.height,
+          imgProps.objectFit
+        );
+
+        pdf.addImage(
+          dataUrl,
+          'PNG',
+          placement.x,
+          placement.y,
+          placement.width,
+          placement.height
+        );
+        break;
+
+      case 'shape':
+        const shapeProps = element.properties as ShapeProperties;
+        pdf.setFillColor(shapeProps.fill || '#000000');
+        if (shapeProps.stroke) {
+          pdf.setDrawColor(shapeProps.stroke);
+          pdf.setLineWidth(shapeProps.strokeWidth || 1);
+        }
+
+        // 矩形描画
+        const drawMode = shapeProps.stroke ? 'FD' : 'F';
+        pdf.rect(element.x, element.y, element.width, element.height, drawMode);
+        break;
+    }
+  }
+
+  /**
+   * 画像配置を計算（フィット方法に応じて）
+   */
+  private static async calculateImagePlacement(
+    dataUrl: string,
+    x: number,
+    y: number,
+    targetWidth: number,
+    targetHeight: number,
+    fit: ImageFit
+  ): Promise<{ x: number; y: number; width: number; height: number }> {
+    // 画像の実際のサイズを取得
+    const { width: imgWidth, height: imgHeight } = await this.getImageDimensions(dataUrl);
+
+    switch (fit) {
+      case 'contain': {
+        // 縦横比を保持し、全体を表示
+        const aspectRatio = imgWidth / imgHeight;
+        const targetAspectRatio = targetWidth / targetHeight;
+
+        if (aspectRatio > targetAspectRatio) {
+          // 横長の画像
+          const scaledWidth = targetWidth;
+          const scaledHeight = targetWidth / aspectRatio;
+          const offsetY = (targetHeight - scaledHeight) / 2;
+          return { x, y: y + offsetY, width: scaledWidth, height: scaledHeight };
+        } else {
+          // 縦長の画像
+          const scaledHeight = targetHeight;
+          const scaledWidth = targetHeight * aspectRatio;
+          const offsetX = (targetWidth - scaledWidth) / 2;
+          return { x: x + offsetX, y, width: scaledWidth, height: scaledHeight };
+        }
+      }
+
+      case 'cover': {
+        // 縦横比を保持し、領域を埋める（切り取り）
+        const aspectRatio = imgWidth / imgHeight;
+        const targetAspectRatio = targetWidth / targetHeight;
+
+        if (aspectRatio > targetAspectRatio) {
+          // 横長の画像（高さに合わせて、幅を切り取り）
+          const scaledHeight = targetHeight;
+          const scaledWidth = targetHeight * aspectRatio;
+          const offsetX = -(scaledWidth - targetWidth) / 2;
+          return { x: x + offsetX, y, width: scaledWidth, height: scaledHeight };
+        } else {
+          // 縦長の画像（幅に合わせて、高さを切り取り）
+          const scaledWidth = targetWidth;
+          const scaledHeight = targetWidth / aspectRatio;
+          const offsetY = -(scaledHeight - targetHeight) / 2;
+          return { x, y: y + offsetY, width: scaledWidth, height: scaledHeight };
+        }
+      }
+
+      case 'fill':
+        // 縦横比を無視して引き伸ばす
+        return { x, y, width: targetWidth, height: targetHeight };
+
+      case 'none':
+      default:
+        // 元のサイズで中央配置
+        const offsetX = (targetWidth - imgWidth) / 2;
+        const offsetY = (targetHeight - imgHeight) / 2;
+        return { x: x + offsetX, y: y + offsetY, width: imgWidth, height: imgHeight };
+    }
+  }
+
+  /**
+   * 画像のサイズを取得
+   */
+  private static getImageDimensions(
+    dataUrl: string
+  ): Promise<{ width: number; height: number }> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  private static blobToDataURL(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+}
+```
+
+#### 6. HTML (reveal.js) 形式
+
+reveal.jsを使用したWebプレゼンテーション形式でエクスポートします。
+
+**エクスポート実装**:
+
+```typescript
+// services/export/htmlExporter.ts
+
+export class HTMLExporter {
+  /**
+   * HTML (reveal.js) 形式でエクスポート
+   */
+  static async exportAsHTML(projectId: string): Promise<Blob> {
+    const storageManager = new StorageManager();
+    const project = await storageManager.getProject(projectId);
+    const slides = await storageManager.getSlidesByProject(projectId);
+
+    let html = '';
+
+    // HTMLヘッダー
+    html += this.getHTMLHeader(project.name);
+
+    // スライドコンテンツ
+    html += '<div class="reveal">\n';
+    html += '  <div class="slides">\n';
+
+    for (const slide of slides) {
+      html += await this.convertSlideToHTML(slide, storageManager);
+    }
+
+    html += '  </div>\n';
+    html += '</div>\n';
+
+    // HTMLフッター
+    html += this.getHTMLFooter();
+
+    return new Blob([html], { type: 'text/html' });
+  }
+
+  /**
+   * HTMLヘッダー
+   */
+  private static getHTMLHeader(title: string): string {
+    return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4/dist/theme/white.css">
+  <style>
+    .reveal img {
+      max-width: 100%;
+      max-height: 100%;
+    }
+    .reveal .image-contain {
+      object-fit: contain;
+    }
+    .reveal .image-cover {
+      object-fit: cover;
+    }
+    .reveal .image-fill {
+      object-fit: fill;
+    }
+    .reveal .image-none {
+      object-fit: none;
+    }
+  </style>
+</head>
+<body>
+`;
+  }
+
+  /**
+   * HTMLフッター
+   */
+  private static getHTMLFooter(): string {
+    return `
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    controls: true,
+    progress: true,
+    center: true,
+    hash: true,
+    transition: 'slide', // none/fade/slide/convex/concave/zoom
+  });
+</script>
+</body>
+</html>
+`;
+  }
+
+  /**
+   * スライドをHTMLに変換
+   */
+  private static async convertSlideToHTML(
+    slide: Slide,
+    storageManager: StorageManager
+  ): Promise<string> {
+    let html = '    <section';
+
+    // 背景
+    if (slide.background.type === 'solid' && slide.background.color) {
+      html += ` data-background-color="${slide.background.color}"`;
+    } else if (slide.background.type === 'image' && slide.background.imageAssetId) {
+      const asset = await storageManager.getAsset(slide.background.imageAssetId);
+      const dataUrl = await this.blobToDataURL(asset.blob);
+      html += ` data-background-image="${dataUrl}"`;
+      html += ` data-background-size="cover"`;
+    }
+
+    html += '>\n';
+
+    // タイトル
+    if (slide.title) {
+      html += `      <h1>${this.escapeHTML(slide.title)}</h1>\n`;
+    }
+
+    // テキスト要素
+    const textElements = slide.elements.filter((el) => el.type === 'text');
+    for (const textEl of textElements) {
+      if (textEl.type === 'text') {
+        const { content, fontSize } = textEl.properties;
+        const style = `font-size: ${fontSize}px;`;
+
+        if (fontSize >= 32) {
+          html += `      <h2 style="${style}">${this.escapeHTML(content)}</h2>\n`;
+        } else if (fontSize >= 24) {
+          html += `      <h3 style="${style}">${this.escapeHTML(content)}</h3>\n`;
+        } else {
+          html += `      <p style="${style}">${this.escapeHTML(content)}</p>\n`;
+        }
+      }
+    }
+
+    // 画像要素
+    const imageElements = slide.elements.filter((el) => el.type === 'image');
+    for (const imgEl of imageElements) {
+      if (imgEl.type === 'image') {
+        const asset = await storageManager.getAsset(imgEl.properties.assetId);
+        const dataUrl = await this.blobToDataURL(asset.blob);
+        const fit = imgEl.properties.objectFit || 'contain';
+        const className = `image-${fit}`;
+
+        html += `      <img src="${dataUrl}" class="${className}" style="width: ${imgEl.width}px; height: ${imgEl.height}px;">\n`;
+      }
+    }
+
+    // ノート
+    if (slide.notes) {
+      html += `      <aside class="notes">\n`;
+      html += `        ${this.escapeHTML(slide.notes)}\n`;
+      html += `      </aside>\n`;
+    }
+
+    html += '    </section>\n';
+
+    return html;
+  }
+
+  private static escapeHTML(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  private static blobToDataURL(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
 }
 ```
 
