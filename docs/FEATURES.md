@@ -13,23 +13,34 @@ Local AI Slide Creatorは、以下の主要機能を提供します：
 
 | カテゴリ | 機能 | 優先度 | フェーズ |
 |---------|------|--------|---------|
-| プロジェクト管理 | 新規作成・保存・読み込み | 高 | MVP |
+| データ管理 | クライアント側ストレージ（IndexedDB） | 高 | MVP |
+| データ管理 | JSON形式エクスポート/インポート | 高 | MVP |
+| データ管理 | ZIP形式エクスポート/インポート | 中 | Phase 2 |
+| データ管理 | Marp形式エクスポート/インポート | 中 | Phase 2 |
+| データ管理 | 履歴・Undo/Redo | 中 | Phase 2 |
+| プロジェクト管理 | 新規作成・保存・読み込み（クライアント側） | 高 | MVP |
+| プロジェクト管理 | プロジェクト一覧・検索 | 中 | MVP |
+| プロジェクト管理 | 最近使ったプロジェクト | 中 | MVP |
 | AI生成 | スライド構成自動生成 | 高 | MVP |
 | AI生成 | コンテンツ自動生成 | 高 | MVP |
 | AI生成 | AI画像生成 | 中 | Phase 2 |
-| AI生成 | トークスクリプト自動生成 | 中 | Phase 4 |
+| AI生成 | トークスクリプト自動生成 | 中 | Phase 3 |
+| AI生成 | テンプレート選択支援 | 中 | MVP |
 | 編集 | ドラッグ&ドロップエディタ | 高 | MVP |
 | 編集 | テキスト編集 | 高 | MVP |
-| 編集 | 画像配置 | 高 | MVP |
+| 編集 | 画像配置・fit設定（contain/cover/fill） | 高 | MVP |
 | 編集 | SVG編集 | 中 | Phase 2 |
-| アセット | 画像アップロード | 高 | MVP |
+| 編集 | スライド並び替え | 高 | MVP |
+| アセット | 画像アップロード（IndexedDB保存） | 高 | MVP |
 | アセット | SVGインポート | 中 | Phase 2 |
-| アセット | アイコンライブラリ | 高 | MVP |
+| アセット | アイコンライブラリ（Heroicons, Feather等） | 高 | MVP |
 | アセット | アセット検索・管理 | 中 | Phase 2 |
-| テンプレート | プリセットテンプレート | 高 | MVP |
-| テンプレート | 自動レイアウト選択 | 中 | MVP |
-| テンプレート | カスタムテンプレート | 低 | Phase 4 |
-| テーマ | プリセットテーマ | 高 | MVP |
+| テンプレート | プリセットテンプレート（10種類） | 高 | MVP |
+| テンプレート | テンプレート定義システム | 高 | MVP |
+| テンプレート | AI自動レイアウト選択 | 中 | MVP |
+| テンプレート | カスタムテンプレート作成 | 低 | Phase 4 |
+| テーマ | プリセットテーマ（5種類） | 高 | MVP |
+| テーマ | テーマ切り替え | 中 | MVP |
 | テーマ | カスタムテーマ | 中 | Phase 4 |
 | デジタルサイネージ | 自動再生モード | 中 | Phase 3 |
 | デジタルサイネージ | ループ再生 | 中 | Phase 3 |
@@ -37,12 +48,14 @@ Local AI Slide Creatorは、以下の主要機能を提供します：
 | デジタルサイネージ | スケジュール機能 | 低 | Phase 5 |
 | 音声合成 | トークスクリプト設定 | 中 | Phase 3 |
 | 音声合成 | Web Speech API統合 | 中 | Phase 3 |
-| 音声合成 | ローカルTTS統合 | 低 | Phase 4 |
-| 音声合成 | 音声設定（速度・音程） | 中 | Phase 3 |
+| 音声合成 | ローカルTTS統合（Coqui/Piper） | 低 | Phase 4 |
+| 音声合成 | 音声設定（速度・音程・音量） | 中 | Phase 3 |
 | エクスポート | PDF出力 | 高 | MVP |
 | エクスポート | PPTX出力 | 中 | Phase 3 |
-| エクスポート | HTML出力 | 低 | Phase 3 |
+| エクスポート | Marp（Markdown）出力 | 中 | Phase 2 |
+| エクスポート | HTML/reveal.js出力 | 低 | Phase 3 |
 | エクスポート | 動画出力（音声付き） | 低 | Phase 4 |
+| エクスポート | 画像fit処理（contain/cover/fill/none） | 高 | MVP |
 | プレゼンテーション | プレゼンターモード | 中 | Phase 3 |
 | プレゼンテーション | 音声付きプレゼン | 中 | Phase 3 |
 
@@ -88,7 +101,22 @@ So that プロフェッショナルな見た目のプレゼンテーションに
 - テンプレートを途中で変更できる
 - 全スライドに一貫したデザインが適用される
 
-### 4. 柔軟なエクスポート
+### 4. データポータビリティとバックアップ
+
+```
+As a ユーザー
+I want to プロジェクトデータをエクスポート/インポートしたい
+So that 別の環境に移行したり、バックアップを取ったりできる
+```
+
+**受入基準**:
+- JSON形式でプロジェクト全体をエクスポートできる
+- ZIP形式で画像を含めてエクスポートできる
+- Marp（Markdown）形式でエクスポート/インポートできる
+- エクスポートしたファイルを別の環境でインポートできる
+- データはクライアント側に保存され、サーバーには送信されない
+
+### 5. 柔軟なエクスポート
 
 ```
 As a ユーザー
@@ -99,9 +127,12 @@ So that 異なる環境やツールで使用できる
 **受入基準**:
 - PDFで高品質に出力できる
 - PowerPoint形式で出力できる（編集可能）
+- Marp（Markdown）形式で出力できる（Git管理可能）
+- HTML/reveal.js形式で出力できる
+- 画像のfit設定（contain/cover/fill/none）が正しく反映される
 - 各スライドを画像として保存できる
 
-### 5. デジタルサイネージとしての活用
+### 6. デジタルサイネージとしての活用
 
 ```
 As a ユーザー
@@ -115,7 +146,7 @@ So that 店舗や展示会で無人で情報を表示できる
 - トランジション効果を設定できる
 - フルスクリーンで表示できる
 
-### 6. 音声付きプレゼンテーション
+### 7. 音声付きプレゼンテーション
 
 ```
 As a ユーザー
@@ -193,6 +224,46 @@ So that 視覚的に分かりやすいスライドを素早く作成できる
   - デフォルトサイズ
   - 背景色
   - フォント設定
+
+#### 1.4 データ管理（エクスポート/インポート）
+
+**重要**: すべてのユーザーデータはクライアント側（IndexedDB/localStorage）に保存され、サーバーには送信されません。
+
+- **クライアント側ストレージ**:
+  - IndexedDB: プロジェクト、スライド、要素、アセット（Blob）、履歴
+  - localStorage: UI設定、AI設定、最近使ったプロジェクト（5MB制限）
+  - 自動保存: 30秒ごとにIndexedDBに保存
+
+- **エクスポート機能**:
+  1. **JSON形式（軽量）**:
+     - プロジェクトデータの完全エクスポート
+     - 画像はBase64エンコード
+     - 小規模プロジェクト向け（<10MB）
+     - 用途: クイックバックアップ、データ移行
+
+  2. **ZIP形式（推奨）**:
+     - プロジェクトデータ + 画像ファイル
+     - 画像は別ファイルとして保存（効率的）
+     - 大規模プロジェクト向け
+     - 用途: 完全バックアップ、アーカイブ
+
+  3. **Marp形式（Markdown）**:
+     - Markdown + Frontmatter
+     - Git管理可能
+     - テキストエディタで編集可能
+     - 画像はBase64またはファイル参照
+     - 用途: バージョン管理、コラボレーション
+
+- **インポート機能**:
+  - JSON/ZIP/Marpファイルのインポート
+  - プロジェクトの復元
+  - 既存プロジェクトへのマージ（オプション）
+  - インポート時のバリデーション
+
+- **データポータビリティ**:
+  - 環境間移行: エクスポート → 別環境でインポート
+  - バックアップ/復元
+  - データ主権: ユーザーがデータを完全管理
 
 ### 2. AI生成機能
 
@@ -434,15 +505,100 @@ function selectLayout(content: SlideContent, position: number, total: number): L
 }
 ```
 
-#### 4.3 カスタムテンプレート（Phase 3）
+#### 4.3 テンプレート定義システム（MVP）
+
+**重要**: テンプレートは構造化されたJSON形式で定義され、デザイナー（非開発者）でも作成可能です。
+
+- **テンプレート構造**:
+  ```typescript
+  interface TemplateLayout {
+    id: string;
+    name: string;
+    description: string;
+    size: { width: number; height: number; aspectRatio: string };
+    areas: LayoutArea[];           // レイアウト領域の定義
+    selectionCriteria: SelectionCriteria;  // AI選択用メタデータ
+    styleGuide: StyleGuide;        // デザインガイドライン
+  }
+  ```
+
+- **レイアウト領域（Area）定義**:
+  ```typescript
+  interface LayoutArea {
+    id: string;
+    type: AreaType;  // 'title' | 'subtitle' | 'text' | 'bullets' | 'image' | 'icon' | 'shape'
+    position: { x: string; y: string; width: string; height: string };  // % or px
+    constraints: {
+      minWidth?: number;
+      maxCharacters?: number;
+      maxLines?: number;
+      required: boolean;
+      resizable: boolean;
+      movable: boolean;
+    };
+    defaultStyle: AreaStyle;       // デフォルトスタイル
+    placementHints: PlacementHints;  // AI配置ガイダンス
+  }
+  ```
+
+- **AI選択基準**:
+  ```typescript
+  interface SelectionCriteria {
+    category: 'title' | 'content' | 'image' | 'bullets' | 'quote' | 'section' | 'comparison';
+    tags: string[];  // ['business', 'simple', 'modern']
+    contentFit: {
+      textAmount: 'none' | 'minimal' | 'moderate' | 'heavy';
+      imageCount: 'none' | 'single' | 'multiple';
+      hasBullets: boolean;
+      recommendedTextLength?: { min: number; max: number };
+    };
+    usageScenario: string[];  // ['opening', 'content', 'closing']
+    scoringWeights: {
+      textAmountMatch: number;    // 0.3
+      imageCountMatch: number;    // 0.2
+      categoryMatch: number;      // 0.3
+      tagMatch: number;           // 0.1
+      usageFrequency: number;     // 0.1
+    };
+  }
+  ```
+
+- **AI選択アルゴリズム**:
+  1. コンテンツ分析: テキスト量、画像数、箇条書きの有無
+  2. スコアリング: 各テンプレートに適合度スコアを計算
+  3. 上位候補選択: スコアの高い上位3-5個
+  4. ユーザー提示: 推奨テンプレートと代替案
+
+- **デフォルトテンプレート10種類**:
+
+| ID | 名前 | カテゴリ | テキスト量 | 画像数 | 箇条書き |
+|----|------|----------|-----------|--------|---------|
+| template_title | タイトルスライド | title | minimal | none | なし |
+| template_content | コンテンツスライド | content | moderate | 0-2 | 可能 |
+| template_two_column | 2カラム | content | moderate | 0-2 | 可能 |
+| template_image_left | 画像左 | image | moderate | single | 可能 |
+| template_image_right | 画像右 | image | moderate | single | 可能 |
+| template_image_full | 画像フル | image | minimal | single | なし |
+| template_bullets | 箇条書き | bullets | moderate | 0-1 | 必須 |
+| template_quote | 引用 | quote | minimal | none | なし |
+| template_section | セクションヘッダー | section | minimal | none | なし |
+| template_comparison | 比較 | comparison | moderate | 0-2 | 可能 |
+
+- **テンプレート拡張性**:
+  - サーバーから新しいテンプレートを取得
+  - ユーザーがカスタムテンプレートを作成（Phase 4）
+  - コミュニティテンプレートのインポート（Phase 5）
+
+#### 4.4 カスタムテンプレート（Phase 4）
 - **テンプレート作成**:
   - 既存スライドからテンプレート化
   - プレースホルダーの定義
   - テンプレート名と説明
+  - JSON形式でエクスポート
 
 - **共有**:
-  - JSONエクスポート
-  - インポート機能
+  - JSONエクスポート/インポート
+  - テンプレートマーケットプレイス（将来）
 
 ### 5. テーマシステム
 
