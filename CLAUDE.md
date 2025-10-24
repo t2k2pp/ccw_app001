@@ -1,249 +1,840 @@
-# Local AI Slide Creator
+# 開発規約・ガイドライン
 
-## プロジェクト概要
+このドキュメントは、Local AI Slide Creator の開発において、すべての開発者（人間・AI含む）が従うべきルール、規約、ガイドラインを定義します。
 
-ローカルLLMとローカル画像生成AIを活用した、インテリジェントなスライド作成アプリケーション。
-Gamma、Beautiful.ai、Canva、Google Slidesなどの優れたスライド作成サービスの機能を参考にしつつ、
-完全にローカル環境で動作する、プライバシーとカスタマイズ性を重視したソリューションを提供します。
+## 目次
+1. [コーディング規約](#コーディング規約)
+2. [テスト戦略](#テスト戦略)
+3. [デザインパターン](#デザインパターン)
+4. [ディレクトリ構造](#ディレクトリ構造)
+5. [Git運用ルール](#git運用ルール)
+6. [コードレビュー基準](#コードレビュー基準)
+7. [エラーハンドリング](#エラーハンドリング)
+8. [パフォーマンスガイドライン](#パフォーマンスガイドライン)
 
-## ビジョン
+## コーディング規約
 
-- **プライバシー第一**: すべての処理をローカルで完結し、機密情報が外部に漏れる心配がない
-- **AI支援と手動編集のハイブリッド**: 完全自動生成から細かな手動調整まで、柔軟な作業スタイルに対応
-- **プロフェッショナルな品質**: テンプレートとAIの組み合わせで、デザインの知識がなくても美しいスライドを作成
-- **拡張性**: 様々なローカルLLMや画像生成モデルに対応可能な柔軟なアーキテクチャ
+### TypeScript / JavaScript
 
-## コア機能
+#### ESLint設定
+```json
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    "prettier"
+  ],
+  "rules": {
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "react/react-in-jsx-scope": "off",
+    "react/prop-types": "off",
+    "no-console": ["warn", { "allow": ["warn", "error"] }]
+  }
+}
+```
 
-### 1. AIコンテンツ生成
-- **ローカルLLM統合**: Ollama、LM Studio、llama.cpp などのローカルLLM APIに対応
-- **スライド構成の自動生成**: トピックからスライドの構成を自動で提案
-- **コンテンツの自動生成**: タイトル、本文、箇条書きなどを自動生成
-- **トーン調整**: ビジネス、カジュアル、アカデミックなど、用途に応じた文体調整
+#### Prettier設定
+```json
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "arrowParens": "always"
+}
+```
 
-### 2. AI画像生成
-- **Stable Diffusion統合**: ローカルのStable Diffusion WebUI API等に対応
-- **コンテキスト理解画像生成**: スライドの内容に合わせた画像を自動生成
-- **スタイル指定**: 写実的、イラスト、抽象的など、様々なスタイルに対応
-- **画像編集**: 生成した画像の再生成や調整
+#### TypeScript厳格モード
+- **必須**: `strict: true` を `tsconfig.json` で有効化
+- `strictNullChecks`: true
+- `strictFunctionTypes`: true
+- `noImplicitAny`: true
+- `noImplicitThis`: true
 
-### 3. テンプレートシステム
-- **豊富なレイアウト**: タイトルスライド、箇条書き、2カラム、画像中心など多様なレイアウト
-- **自動レイアウト選択**: コンテンツの種類や量に応じて最適なレイアウトを自動選択
-- **カスタマイズ可能**: ユーザーが独自のテンプレートを作成・共有可能
+#### 命名規則
 
-### 4. テーマシステム
-- **プリセットテーマ**: プロフェッショナル、モダン、ミニマル、カラフルなど
-- **カラースキーム**: 自動配色とカスタムカラーパレット
-- **フォント管理**: Web fontとシステムフォントの統合管理
-- **一貫性の維持**: プレゼンテーション全体でデザインの一貫性を自動保持
+**変数・関数**:
+```typescript
+// ✅ Good: camelCase
+const slideCount = 10;
+function generateSlide(): Slide { }
 
-### 5. 編集機能
-- **リアルタイムプレビュー**: 変更が即座に反映されるWYSIWYGエディタ
-- **ドラッグ&ドロップ**: 要素の配置を直感的に調整
-- **部分的AI支援**: 必要な要素だけをAIに生成させる
-- **履歴管理**: 変更履歴の保存とUndo/Redo機能
+// ❌ Bad: snake_case, PascalCase
+const slide_count = 10;
+function GenerateSlide(): Slide { }
+```
 
-### 6. アセット管理
-- **画像アップロード**: ユーザーが任意の画像をアップロードして使用
-- **SVGサポート**: SVGファイルのインポートと編集
-- **アイコンライブラリ**: プリセットのアイコン/SVGコレクション（Heroicons、Feather、Material Iconsなど）
-- **アセット検索**: AIがスライド生成時に利用可能なアセットを検索・活用
-- **アセット管理**: プロジェクト内のすべてのアセットを一元管理
+**型・インターフェース・クラス**:
+```typescript
+// ✅ Good: PascalCase
+interface SlideData { }
+type ElementType = 'text' | 'image';
+class SlideManager { }
 
-### 7. デジタルサイネージ機能
-- **自動再生モード**: スライドを指定時間で自動切り替え
-- **ループ再生**: プレゼンテーションを繰り返し再生
-- **トランジション効果**: スライド間の切り替えアニメーション
-- **リモート更新**: サイネージ表示中のコンテンツをリモートで更新（将来機能）
-- **スケジュール機能**: 時間帯別のコンテンツ切り替え（将来機能）
+// ❌ Bad: camelCase, snake_case
+interface slideData { }
+type element_type = 'text' | 'image';
+```
 
-### 8. 音声合成プレゼンテーション
-- **トークスクリプト**: 各スライドに音声読み上げ用のスクリプトを設定
-- **ローカル音声合成**: ブラウザのWeb Speech API または ローカルTTSエンジン統合
-- **AI生成スクリプト**: LLMがスライド内容から自動でトークスクリプトを生成
-- **音声設定**: 速度、音程、音量の調整
-- **タイミング同期**: スライド表示と音声のタイミングを自動調整
-- **音声エクスポート**: トークスクリプトを音声ファイルとして出力
+**定数**:
+```typescript
+// ✅ Good: UPPER_SNAKE_CASE
+const MAX_SLIDE_COUNT = 100;
+const DEFAULT_TRANSITION_DURATION = 500;
 
-### 9. エクスポート
-- **複数フォーマット対応**: PDF、PPTX、HTML、画像シーケンス、動画（音声付き）
-- **高品質出力**: ベクターグラフィックスとラスター画像の適切な処理
-- **プレゼンテーションモード**: ブラウザベースのプレゼンター表示
-- **音声付きエクスポート**: トークスクリプトの音声と同期した動画出力
+// ❌ Bad: camelCase
+const maxSlideCount = 100;
+```
 
-## 技術スタック
+**コンポーネント（React）**:
+```typescript
+// ✅ Good: PascalCase, 関数コンポーネント
+export function SlideEditor(): JSX.Element { }
+
+// ❌ Bad: クラスコンポーネント（禁止）
+export class SlideEditor extends React.Component { }
+```
+
+**ファイル名**:
+```
+components/SlideEditor.tsx        # コンポーネント: PascalCase
+utils/slideHelpers.ts             # ユーティリティ: camelCase
+types/slide.ts                    # 型定義: camelCase
+constants/slideConstants.ts       # 定数: camelCase
+hooks/useSlide.ts                 # カスタムフック: camelCase (use prefix)
+```
+
+#### インポート順序
+```typescript
+// 1. 外部ライブラリ
+import React from 'react';
+import { useState, useEffect } from 'react';
+
+// 2. 内部モジュール（絶対パス）
+import { SlideData } from '@/types/slide';
+import { generateSlide } from '@/services/slideService';
+
+// 3. 相対パス
+import { Button } from './Button';
+import styles from './SlideEditor.module.css';
+
+// 4. 型インポート（別途）
+import type { Slide, Element } from '@/types';
+```
+
+### Python（バックエンド選択時）
+
+#### PEP 8準拠
+- **必須**: flake8 + black を使用
+- 行の長さ: 最大100文字（blackのデフォルト88も可）
+- インデント: スペース4つ
+
+#### black設定
+```toml
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+```
+
+#### flake8設定
+```ini
+[flake8]
+max-line-length = 100
+extend-ignore = E203, W503
+exclude = .git,__pycache__,venv
+```
+
+#### 型ヒント必須
+```python
+# ✅ Good
+def generate_slide(topic: str, count: int) -> list[Slide]:
+    ...
+
+# ❌ Bad: 型ヒントなし
+def generate_slide(topic, count):
+    ...
+```
+
+## テスト戦略
+
+### テスト駆動開発（TDD）
+
+#### 基本方針
+- **必須**: すべての新機能はTDDで実装
+- Red → Green → Refactorサイクルを厳守
+
+#### TDDサイクル
+```
+1. Red: 失敗するテストを書く
+2. Green: 最小限のコードで テストを通す
+3. Refactor: コードを綺麗にする
+4. 繰り返し
+```
+
+#### テストの粒度
+- **ユニットテスト**: すべての関数・メソッド
+- **統合テスト**: APIエンドポイント、データベース操作
+- **E2Eテスト**: 主要ユーザーフロー（最低3シナリオ）
+
+### カバレッジ目標
+
+```
+全体カバレッジ: 80%以上（必須）
+重要モジュール: 90%以上（推奨）
+
+- services/: 90%以上
+- utils/: 85%以上
+- components/: 70%以上
+- hooks/: 85%以上
+```
+
+### テストツール
+
+#### Frontend
+```json
+{
+  "test": "vitest",
+  "e2e": "playwright",
+  "coverage": "@vitest/coverage-v8"
+}
+```
+
+#### Backend（Node.js）
+```json
+{
+  "test": "jest",
+  "e2e": "supertest",
+  "coverage": "jest --coverage"
+}
+```
+
+#### Backend（Python）
+```python
+# pytest + pytest-cov
+pytest --cov=app --cov-report=html
+```
+
+### テスト命名規則
+
+```typescript
+// ✅ Good: describe - it パターン
+describe('SlideService', () => {
+  describe('generateSlide', () => {
+    it('should generate slide with given topic', () => {
+      // Arrange
+      const topic = 'AI Technology';
+
+      // Act
+      const slide = generateSlide(topic);
+
+      // Assert
+      expect(slide.title).toContain('AI');
+    });
+
+    it('should throw error when topic is empty', () => {
+      expect(() => generateSlide('')).toThrow('Topic is required');
+    });
+  });
+});
+```
+
+```python
+# ✅ Good: test_ prefix
+class TestSlideService:
+    def test_generate_slide_with_valid_topic(self):
+        # Arrange
+        topic = "AI Technology"
+
+        # Act
+        slide = generate_slide(topic)
+
+        # Assert
+        assert "AI" in slide.title
+
+    def test_generate_slide_raises_error_when_topic_empty(self):
+        with pytest.raises(ValueError, match="Topic is required"):
+            generate_slide("")
+```
+
+### モック・スタブの使用
+
+```typescript
+// AI API呼び出しは必ずモック
+vi.mock('@/services/aiService', () => ({
+  generateContent: vi.fn().mockResolvedValue({
+    content: 'Generated content',
+  }),
+}));
+```
+
+## デザインパターン
+
+### 推奨パターン
+
+#### 1. Repository Pattern（データアクセス層）
+```typescript
+// ✅ Good
+interface SlideRepository {
+  findById(id: string): Promise<Slide | null>;
+  save(slide: Slide): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+class LocalStorageSlideRepository implements SlideRepository {
+  async findById(id: string): Promise<Slide | null> {
+    // Implementation
+  }
+}
+```
+
+#### 2. Adapter Pattern（AI統合層）
+```typescript
+// ✅ Good: すべてのAI APIはアダプターを通す
+interface LLMAdapter {
+  generate(prompt: string, params: GenerationParams): Promise<string>;
+}
+
+class OllamaAdapter implements LLMAdapter {
+  async generate(prompt: string, params: GenerationParams): Promise<string> {
+    // Ollama specific implementation
+  }
+}
+
+class LMStudioAdapter implements LLMAdapter {
+  async generate(prompt: string, params: GenerationParams): Promise<string> {
+    // LM Studio specific implementation
+  }
+}
+```
+
+#### 3. Strategy Pattern（レイアウト選択）
+```typescript
+// ✅ Good
+interface LayoutStrategy {
+  selectLayout(content: SlideContent): LayoutTemplate;
+}
+
+class AutoLayoutStrategy implements LayoutStrategy {
+  selectLayout(content: SlideContent): LayoutTemplate {
+    // AI-based selection
+  }
+}
+
+class ManualLayoutStrategy implements LayoutStrategy {
+  selectLayout(content: SlideContent): LayoutTemplate {
+    // User selection
+  }
+}
+```
+
+#### 4. Factory Pattern（要素生成）
+```typescript
+// ✅ Good
+class ElementFactory {
+  static create(type: ElementType, props: ElementProps): Element {
+    switch (type) {
+      case 'text':
+        return new TextElement(props);
+      case 'image':
+        return new ImageElement(props);
+      case 'shape':
+        return new ShapeElement(props);
+      default:
+        throw new Error(`Unknown element type: ${type}`);
+    }
+  }
+}
+```
+
+#### 5. Observer Pattern（状態管理 - Zustand）
+```typescript
+// ✅ Good: Zustandのstoreはobserverパターン
+const useSlideStore = create<SlideStore>((set) => ({
+  slides: [],
+  addSlide: (slide) => set((state) => ({
+    slides: [...state.slides, slide]
+  })),
+}));
+```
+
+### 禁止パターン
+
+❌ **Singleton（グローバル状態の乱用）**
+```typescript
+// ❌ Bad
+class GlobalState {
+  private static instance: GlobalState;
+  private constructor() {}
+  static getInstance() {
+    if (!GlobalState.instance) {
+      GlobalState.instance = new GlobalState();
+    }
+    return GlobalState.instance;
+  }
+}
+
+// ✅ Good: Zustandまたは Context API を使用
+```
+
+❌ **God Object（すべてを持つ巨大クラス）**
+```typescript
+// ❌ Bad: 1つのクラスが多すぎる責務
+class SlideManager {
+  createSlide() {}
+  deleteSlide() {}
+  exportToPDF() {}
+  exportToPPTX() {}
+  generateWithAI() {}
+  applyTheme() {}
+  // ... 20+ methods
+}
+
+// ✅ Good: 責務を分割
+class SlideService {}
+class ExportService {}
+class AIService {}
+class ThemeService {}
+```
+
+## ディレクトリ構造
+
+### Frontend（React + TypeScript）
+
+```
+src/
+├── components/              # UIコンポーネント
+│   ├── common/             # 共通コンポーネント
+│   │   ├── Button/
+│   │   │   ├── Button.tsx
+│   │   │   ├── Button.test.tsx
+│   │   │   └── Button.module.css
+│   │   └── ...
+│   ├── editor/             # エディタ関連
+│   ├── slides/             # スライド表示
+│   └── ...
+├── hooks/                  # カスタムフック
+│   ├── useSlide.ts
+│   ├── useSlide.test.ts
+│   └── ...
+├── stores/                 # 状態管理（Zustand）
+│   ├── slideStore.ts
+│   ├── slideStore.test.ts
+│   └── ...
+├── services/               # ビジネスロジック
+│   ├── slideService.ts
+│   ├── slideService.test.ts
+│   ├── ai/                 # AI関連サービス
+│   │   ├── llmService.ts
+│   │   ├── imageGenService.ts
+│   │   └── ttsService.ts
+│   └── ...
+├── repositories/           # データアクセス
+│   ├── slideRepository.ts
+│   └── ...
+├── adapters/               # 外部API統合
+│   ├── llm/
+│   │   ├── LLMAdapter.ts
+│   │   ├── OllamaAdapter.ts
+│   │   └── ...
+│   └── ...
+├── types/                  # 型定義
+│   ├── slide.ts
+│   ├── element.ts
+│   └── ...
+├── utils/                  # ユーティリティ
+│   ├── canvas/
+│   ├── layout/
+│   └── ...
+├── constants/              # 定数
+│   ├── slideConstants.ts
+│   └── ...
+├── styles/                 # グローバルスタイル
+└── App.tsx
+```
+
+### Backend（Node.js + Express）
+
+```
+server/
+├── controllers/            # コントローラー
+│   ├── slideController.ts
+│   ├── slideController.test.ts
+│   └── ...
+├── services/               # ビジネスロジック
+├── repositories/           # データアクセス
+├── models/                 # データモデル
+├── routes/                 # ルーティング
+├── middleware/             # ミドルウェア
+├── adapters/               # AI統合
+├── utils/                  # ユーティリティ
+├── types/                  # 型定義
+├── db/                     # データベース
+│   ├── migrations/
+│   └── seeds/
+├── config/                 # 設定ファイル
+└── index.ts
+```
+
+### テストファイル配置ルール
+
+```
+✅ Good: テストは実装ファイルと同じディレクトリ
+src/
+  services/
+    slideService.ts
+    slideService.test.ts
+
+❌ Bad: テストを別ディレクトリに分離
+src/
+  services/
+    slideService.ts
+tests/
+  services/
+    slideService.test.ts
+```
+
+## Git運用ルール
+
+### ブランチ戦略（GitHub Flow）
+
+```
+main                    # 本番環境（常にデプロイ可能）
+  └── feature/*         # 機能開発ブランチ
+  └── fix/*             # バグ修正ブランチ
+  └── hotfix/*          # 緊急修正ブランチ
+```
+
+### ブランチ命名規則
+
+```
+feature/slide-editor-canvas
+feature/ai-content-generation
+fix/slide-deletion-bug
+hotfix/critical-export-error
+```
+
+### コミットメッセージ規約（Conventional Commits）
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+#### Type
+- `feat`: 新機能
+- `fix`: バグ修正
+- `docs`: ドキュメントのみの変更
+- `style`: コードの意味に影響しない変更（フォーマット等）
+- `refactor`: リファクタリング
+- `perf`: パフォーマンス改善
+- `test`: テスト追加・修正
+- `chore`: ビルドプロセスやツールの変更
+
+#### 例
+```
+feat(editor): add drag and drop for slides
+
+Implement drag and drop functionality in slide list.
+Users can now reorder slides by dragging.
+
+Closes #123
+```
+
+```
+fix(export): correct PDF font embedding
+
+Fixed an issue where custom fonts were not embedded in PDF export.
+
+Fixes #456
+```
+
+### プルリクエスト（PR）ルール
+
+#### PRテンプレート
+```markdown
+## 概要
+<!-- 何を変更したか -->
+
+## 変更内容
+- [ ] 機能A を追加
+- [ ] バグB を修正
+
+## テスト
+- [ ] ユニットテスト追加
+- [ ] E2Eテスト追加（必要に応じて）
+- [ ] 手動テスト完了
+
+## スクリーンショット
+<!-- UI変更がある場合 -->
+
+## チェックリスト
+- [ ] ESLint/Prettierでフォーマット済み
+- [ ] テストがすべてパス
+- [ ] ドキュメント更新（必要に応じて）
+- [ ] CHANGELOG更新（必要に応じて）
+```
+
+#### レビュー基準
+- 最低1名の承認が必要
+- CIがすべてパスしていること
+- コードカバレッジが下がっていないこと
+
+## コードレビュー基準
+
+### レビューポイント
+
+#### 必須チェック項目
+- [ ] **動作確認**: 実際に動作するか
+- [ ] **テスト**: 適切なテストが書かれているか
+- [ ] **可読性**: コードが読みやすいか
+- [ ] **パフォーマンス**: パフォーマンス問題はないか
+- [ ] **セキュリティ**: セキュリティリスクはないか
+- [ ] **規約準拠**: コーディング規約に従っているか
+
+#### コメントの書き方
+```
+✅ Good: 具体的で建設的
+「この関数は責務が多すぎるように見えます。SlideService から ExportService への分離を検討してはどうでしょうか？」
+
+❌ Bad: 批判的で具体性がない
+「このコードは良くない」
+```
+
+### レビュー時のトーン
+- 質問形式で提案: 「〜してはどうでしょうか？」
+- 具体例を示す: 「例えば、こうすると〜」
+- 前向きなフィードバック: 「この実装は良いですね！ただ、〜」
+
+## エラーハンドリング
+
+### 基本方針
+
+#### Frontend
+```typescript
+// ✅ Good: カスタムエラークラス
+class SlideError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public details?: unknown
+  ) {
+    super(message);
+    this.name = 'SlideError';
+  }
+}
+
+// 使用例
+throw new SlideError(
+  'Failed to generate slide',
+  'GENERATION_ERROR',
+  { topic, reason }
+);
+```
+
+#### エラーバウンダリ（React）
+```typescript
+// ✅ Good: すべてのページコンポーネントをエラーバウンダリで包む
+<ErrorBoundary fallback={<ErrorPage />}>
+  <SlideEditor />
+</ErrorBoundary>
+```
+
+#### API呼び出しエラー
+```typescript
+// ✅ Good: try-catchとエラーハンドリング
+try {
+  const slide = await slideService.generateSlide(topic);
+  return slide;
+} catch (error) {
+  if (error instanceof AIServiceError) {
+    // AI specific error handling
+    toast.error('AI service is unavailable');
+  } else if (error instanceof NetworkError) {
+    // Network error handling
+    toast.error('Network error. Please check your connection');
+  } else {
+    // Generic error
+    logger.error('Unexpected error', error);
+    toast.error('An unexpected error occurred');
+  }
+  throw error; // Re-throw if needed
+}
+```
+
+### Backend
+```typescript
+// ✅ Good: エラーミドルウェア
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  logger.error(err);
+
+  if (err instanceof ValidationError) {
+    return res.status(422).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: err.message,
+        details: err.details,
+      },
+    });
+  }
+
+  // Default error
+  res.status(500).json({
+    success: false,
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: 'An internal error occurred',
+    },
+  });
+});
+```
+
+## パフォーマンスガイドライン
 
 ### フロントエンド
-- **React 18+** with TypeScript
-- **Fabric.js / Konva.js**: キャンバスベースのスライドエディタ
-- **TailwindCSS**: スタイリング
-- **Zustand / Redux**: 状態管理
-- **React Query**: API通信管理
+
+#### React最適化
+```typescript
+// ✅ Good: メモ化
+const MemoizedSlidePreview = React.memo(SlidePreview);
+
+// ✅ Good: useMemo for expensive calculations
+const sortedSlides = useMemo(() => {
+  return slides.sort((a, b) => a.orderIndex - b.orderIndex);
+}, [slides]);
+
+// ✅ Good: useCallback for event handlers
+const handleSlideClick = useCallback((slideId: string) => {
+  // Handle click
+}, [/* dependencies */]);
+```
+
+#### 画像の最適化
+```typescript
+// ✅ Good: 遅延読み込み
+<img src={slide.thumbnail} loading="lazy" alt="Slide preview" />
+
+// ✅ Good: WebP format with fallback
+<picture>
+  <source srcSet={slide.thumbnail.webp} type="image/webp" />
+  <img src={slide.thumbnail.jpg} alt="Slide preview" />
+</picture>
+```
+
+#### 仮想化（大量データ）
+```typescript
+// ✅ Good: react-virtual for large lists
+import { useVirtual } from 'react-virtual';
+
+function SlideList({ slides }: { slides: Slide[] }) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtual({
+    size: slides.length,
+    parentRef,
+    estimateSize: useCallback(() => 150, []),
+  });
+
+  return (
+    <div ref={parentRef} style={{ height: '600px', overflow: 'auto' }}>
+      {rowVirtualizer.virtualItems.map((virtualRow) => (
+        <div key={virtualRow.index}>
+          <SlidePreview slide={slides[virtualRow.index]} />
+        </div>
+      ))}
+    </div>
+  );
+}
+```
 
 ### バックエンド
-- **Node.js + Express** または **Python + FastAPI**
-- **SQLite / PostgreSQL**: データ永続化
-- **WebSocket**: リアルタイム通信
 
-### AI統合
-- **ローカルLLM API**: REST API経由での統合
-  - Ollama API
-  - LM Studio API
-  - llama.cpp server API
-  - Text Generation WebUI API
-- **画像生成API**: REST API経由での統合
-  - Stable Diffusion WebUI API (AUTOMATIC1111)
-  - ComfyUI API
-  - Custom endpoints
+#### データベースクエリ最適化
+```typescript
+// ✅ Good: インデックスを使用
+CREATE INDEX idx_slides_project_order ON slides(project_id, order_index);
 
-### 音声合成
-- **Web Speech API**: ブラウザネイティブのTTS
-- **ローカルTTS統合**: Coqui TTS、Piper TTS などのローカル音声合成エンジン
-- **音声ファイル生成**: WAV、MP3 形式での音声出力
+// ✅ Good: N+1問題の回避
+const slides = await db.slide.findMany({
+  where: { projectId },
+  include: {
+    elements: true, // Eager loading
+  },
+});
+```
 
-### ファイル処理・エクスポート
-- **pptxgenjs**: PowerPoint生成
-- **jsPDF**: PDF生成
-- **html2canvas / puppeteer**: HTML/画像エクスポート
-- **FFmpeg**: 動画・音声処理（音声付きプレゼンテーション動画の生成）
+#### キャッシング
+```typescript
+// ✅ Good: LRU cache for frequently accessed data
+const templateCache = new LRUCache<string, Template>({
+  max: 100,
+  ttl: 1000 * 60 * 60, // 1 hour
+});
+```
 
-## アーキテクチャ原則
+## ドキュメント管理
 
-### 1. モジュラー設計
-各機能を独立したモジュールとして実装し、保守性と拡張性を確保
+### コードコメント
 
-### 2. API抽象化
-LLMや画像生成APIへのアクセスを抽象レイヤーで包み、異なるバックエンドに簡単に切り替え可能
+```typescript
+// ✅ Good: JSDocコメント（public API）
+/**
+ * Generates a slide based on the given topic using AI.
+ *
+ * @param topic - The topic for the slide
+ * @param params - Generation parameters
+ * @returns Promise resolving to the generated slide
+ * @throws {AIServiceError} If AI service is unavailable
+ * @throws {ValidationError} If topic is invalid
+ *
+ * @example
+ * ```typescript
+ * const slide = await generateSlide('AI Technology', {
+ *   tone: 'formal',
+ *   length: 'medium',
+ * });
+ * ```
+ */
+export async function generateSlide(
+  topic: string,
+  params: GenerationParams
+): Promise<Slide> {
+  // Implementation
+}
+```
 
-### 3. プラグインアーキテクチャ
-テンプレート、テーマ、エクスポーターなどをプラグインとして実装し、コミュニティによる拡張を促進
+```typescript
+// ❌ Bad: 不要なコメント
+// Increment i
+i++;
 
-### 4. パフォーマンス重視
-- 大量のスライドでもスムーズに動作する最適化
-- 画像の遅延読み込みとキャッシング
-- バックグラウンドでのAI処理
+// ✅ Good: 複雑なロジックの説明
+// Calculate optimal layout based on content density
+// Using a weighted scoring algorithm that considers:
+// - Text length (40% weight)
+// - Image count (30% weight)
+// - Bullet points (30% weight)
+const optimalLayout = calculateLayout(content);
+```
 
-### 5. ユーザーエクスペリエンス
-- 直感的なUI/UX
-- レスポンシブデザイン
-- アクセシビリティ対応
-
-## 開発フェーズ
-
-### Phase 1: MVP（最小機能製品）
-- 基本的なスライドエディタ
-- シンプルなテンプレート（5-10種類）
-- ローカルLLM統合（テキスト生成のみ）
-- 基本的なテーマシステム
-- 画像アップロード機能
-- 基本的なアイコンライブラリ（Heroicons等）
-- PDFエクスポート
-
-### Phase 2: AI画像統合 & アセット管理
-- Stable Diffusion統合
-- 画像生成機能
-- 画像配置の自動最適化
-- 画像編集機能
-- SVGサポート
-- 拡張アイコンライブラリ
-- AIによるアセット活用（生成時にアイコンやSVGを選択）
-
-### Phase 3: プレゼンテーション & 音声機能
-- トークスクリプト機能
-- Web Speech API統合（音声合成）
-- デジタルサイネージモード（自動再生）
-- トランジション効果
-- プレゼンターモード
-- 音声付きプレゼンテーション
-- PPTXエクスポート
-
-### Phase 4: 高度な音声・動画機能
-- ローカルTTSエンジン統合（Coqui TTS、Piper等）
-- AI自動トークスクリプト生成
-- 動画エクスポート（音声同期）
-- スケジュール機能（サイネージ用）
-- 高度なレイアウトエンジン
-- カスタムテンプレート作成
-
-### Phase 5: エコシステム
-- プラグインシステム
-- テンプレートマーケットプレイス
-- アイコン/SVGライブラリの拡張機能
-- リモート更新機能（サイネージ用）
-- コラボレーション機能
-- 多言語対応
-
-## セキュリティとプライバシー
-
-- すべてのデータはローカルに保存
-- 外部サーバーへの通信は一切なし（オプトイン機能を除く）
-- ユーザーデータの暗号化オプション
-- セキュアなAPI通信（localhost間でもTLS対応を検討）
-
-## パフォーマンス目標
-
-- スライド100枚までスムーズに編集可能
-- AI応答時間: LLM 3秒以内、画像生成 30秒以内（ハードウェア依存）
-- エクスポート時間: 100スライドを1分以内にPDF化
-- 起動時間: 3秒以内
-
-## 開発ガイドライン
-
-### コーディング規約
-- TypeScript strict mode有効
-- ESLint + Prettier設定
-- コンポーネントは関数コンポーネント＋Hooksで統一
-- テストカバレッジ80%以上を目標
-
-### Git ワークフロー
-- main: 安定版
-- develop: 開発版
-- feature/: 機能開発ブランチ
-- コミットメッセージは日本語・英語どちらでも可
-
-### ドキュメント
-- コード内コメントは英語推奨、設計書は日本語
-- README、API仕様書、ユーザーガイドを維持
-- 重要な設計判断はADR（Architecture Decision Records）に記録
-
-## 参考プロジェクト・サービス
-
-### スライド作成サービス
-- **Gamma**: https://gamma.app/
-  - AI駆動のコンテンツ生成
-  - テンプレートの自動適用
-  - 直感的なカード型UI
-
-- **Beautiful.ai**: https://www.beautiful.ai/
-  - スマートテンプレート
-  - 自動デザイン調整
-  - チーム機能
-
-- **Canva**: https://www.canva.com/
-  - 豊富なテンプレート
-  - ドラッグ&ドロップエディタ
-  - 素材ライブラリ
-
-- **Google Slides**: https://slides.google.com/
-  - リアルタイムコラボレーション
-  - シンプルで使いやすいUI
-  - 豊富なエクスポートオプション
-
-### 技術参考
-- **reveal.js**: HTMLベースのプレゼンテーション
-- **Spectacle**: Reactベースのプレゼンテーションライブラリ
-- **Fabric.js**: キャンバス操作ライブラリ
-
-## ライセンス
-
-MIT License（予定）
-
-## コントリビューション
-
-コントリビューションを歓迎します。詳細はCONTRIBUTING.mdを参照してください。
+### README更新ルール
+- 新機能追加時は必ずREADMEを更新
+- API変更時はAPI.mdを更新
+- 設計変更時はARCHITECTURE.mdを更新
 
 ---
 
 **最終更新**: 2025-10-24
-**プロジェクトステータス**: 設計フェーズ
+**レビュー**: 未実施
+**適用開始**: Phase 1 MVP 開始時
